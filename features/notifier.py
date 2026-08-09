@@ -4,7 +4,7 @@ import os
 import requests
 
 
-def format_df_for_discord(df, max_rows=8, max_cols=6):
+def format_df_for_discord(df, max_rows=20, max_cols=8):
     if df is None or df.empty:
         return "No data available."
 
@@ -23,6 +23,41 @@ def format_df_for_discord(df, max_rows=8, max_cols=6):
     return table
 
 
+def split_long_text(text, max_length=1900):
+    if len(text) <= max_length:
+        yield text
+        return
+
+    lines = text.splitlines(keepends=True)
+    chunk = ""
+
+    for line in lines:
+        if len(chunk) + len(line) <= max_length:
+            chunk += line
+            continue
+
+        if chunk:
+            yield chunk
+            chunk = ""
+
+        if len(line) <= max_length:
+            chunk = line
+        else:
+            for index in range(0, len(line), max_length):
+                yield line[index:index + max_length]
+
+    if chunk:
+        yield chunk
+
+
+def _send_webhook_message(webhook_url, content):
+    response = requests.post(webhook_url, json={"content": content}, timeout=10)
+    if not response.ok:
+        print(f"\nFailed to send Discord notification: {response.status_code} {response.text}")
+        return False
+    return True
+
+
 def send_notification(budget_df, market_df, squad_df, webhook_url=None):
     """Send a Kickbase report using a Discord webhook."""
 
@@ -35,31 +70,25 @@ def send_notification(budget_df, market_df, squad_df, webhook_url=None):
     date_to_show = now + timedelta(days=1) if now.hour >= 22 else now
     today = date_to_show.strftime("%d-%m-%Y")
 
-    message_parts = [f"**Kickbase Report for {today}**"]
+    messages = [f"**Kickbase Report for {today}**"]
+    for title, df in (
+        ("Manager Budgets", budget_df),
+        ("Market Recommendations", market_df),
+        ("Squad Recommendations", squad_df),
+    ):
+        table_text = format_df_for_discord(df)
+        chunks = list(split_long_text(table_text, max_length=1900 - 8))
+        for index, chunk in enumerate(chunks):
+            if index == 0:
+                messages.append(f"**{title}**\n```\n{chunk}\n```")
+            else:
+                messages.append(f"```\n{chunk}\n```")
 
-    message_parts.append("**Manager Budgets**")
-    message_parts.append(f"```\n{format_df_for_discord(budget_df)}\n```")
+    for content in messages:
+        if not _send_webhook_message(webhook_url, content):
+            return
 
-    message_parts.append("**Market Recommendations**")
-    message_parts.append(f"```\n{format_df_for_discord(market_df)}\n```")
-
-    message_parts.append("**Squad Recommendations**")
-    message_parts.append(f"```\n{format_df_for_discord(squad_df)}\n```")
-
-    content = "\n".join(message_parts)
-    if len(content) > 1900:
-        content = (
-            f"**Kickbase Report for {today}**\n"
-            f"Manager Budgets: {len(budget_df)} rows\n"
-            f"Market Recommendations: {len(market_df)} rows\n"
-            f"Squad Recommendations: {len(squad_df)} rows"
-        )
-
-    response = requests.post(webhook_url, json={"content": content})
-    if response.ok:
-        print("\nDiscord notification sent successfully!")
-    else:
-        print(f"\nFailed to send Discord notification: {response.status_code} {response.text}")
+    print("\nDiscord notification sent successfully!")
 
 
 def send_mail(*args, **kwargs):
