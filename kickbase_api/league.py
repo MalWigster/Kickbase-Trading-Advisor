@@ -85,11 +85,18 @@ def get_league_players_on_market(token, league_id):
 
 def get_league_ranking(token, league_id):
     """Get the overall league ranking."""
-    
+
     url = f"{BASE_URL}/leagues/{league_id}/ranking"
     data = get_json_with_token(url, token)
 
-    players = [(user["n"], user["sp"]) for user in data["us"]]
+    players = []
+    for user in data["us"]:
+        if "n" in user and "sp" in user:
+            print(f"User: {user['n']}, Score: {user['sp']}")
+            players.append((user["n"], user["sp"]))
+        elif "n" in user:
+            # Skip users missing 'sp' key instead of raising error
+            print(f"Warning: User '{user['n']}' is missing 'sp' score key, skipping")
 
     # Sort by score (descending)
     ranked = sorted(players, key=lambda x: x[1], reverse=True)

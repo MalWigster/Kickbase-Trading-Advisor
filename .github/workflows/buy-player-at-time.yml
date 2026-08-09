@@ -1,0 +1,60 @@
+name: Buy Player At Time
+
+on:
+  workflow_dispatch:
+    inputs:
+      player_id:
+        description: 'Kickbase player id (preferred)'
+        required: false
+        default: ''
+      player_label:
+        description: 'Kickbase player name or slug'
+        required: false
+        default: ''
+      bid_time:
+        description: 'Target execution time UTC (ISO 8601, e.g. 2026-08-10T03:00:00Z)'
+        required: true
+        default: ''
+      bid_amount:
+        description: 'Bid amount'
+        required: true
+        default: ''
+      competition_id:
+        description: 'Competition id for the league (default 1)'
+        required: false
+        default: '1'
+      league_name:
+        description: 'Optional league name to resolve league id'
+        required: false
+        default: ''
+
+jobs:
+  execute-bid:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run buy-player-at-time
+        env:
+          KICK_USER: ${{ secrets.KICK_USER }}
+          KICK_PASS: ${{ secrets.KICK_PASS }}
+          LEAGUE_NAME: ${{ github.event.inputs.league_name }}
+        run: |
+          python buy_player_at_time.py \
+            --player-id "${{ github.event.inputs.player_id }}" \
+            --player-label "${{ github.event.inputs.player_label }}" \
+            --bid-time "${{ github.event.inputs.bid_time }}" \
+            --bid-amount "${{ github.event.inputs.bid_amount }}" \
+            --competition-id "${{ github.event.inputs.competition_id }}" \
+            --league-name "${{ github.event.inputs.league_name }}"

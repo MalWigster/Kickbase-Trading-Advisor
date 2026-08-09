@@ -28,14 +28,14 @@ def get_manager_performance(token, league_id, manager_id, manager_name):
     
     # Look for season ID "34" (current season 2025/2026)
     tp_value = 0
-    for season in data["it"]:
-        if season["sid"] == "34":
-            tp_value = season["tp"]
-            break
-    else:
-        # Fallback to first season if sid "34" not found
-        tp_value = data["it"][0]["tp"]
-        print(f"Warning: Season ID '34' not found for {manager_name}, using first season")
+    #for season in data["it"]:
+    #    if season["sid"] == "35":
+    #        tp_value = season["tp"]
+    #        break
+    #else:
+    #    # Fallback to first season if sid "34" not found
+    #    tp_value = data["it"][0]["tp"]
+    #    print(f"Warning: Season ID '35' not found for {manager_name}, using first season")
     
 
     return {
