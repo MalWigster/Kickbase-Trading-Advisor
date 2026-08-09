@@ -1,60 +1,38 @@
-name: Buy Player At Time
+name: Run Daily Predictions
 
 on:
+  schedule:
+    - cron: '30 21 * * *'
   workflow_dispatch:
-    inputs:
-      player_id:
-        description: 'Kickbase player id (preferred)'
-        required: false
-        default: ''
-      player_label:
-        description: 'Kickbase player name or slug'
-        required: false
-        default: ''
-      bid_time:
-        description: 'Target execution time UTC (ISO 8601, e.g. 2026-08-10T03:00:00Z)'
-        required: true
-        default: ''
-      bid_amount:
-        description: 'Bid amount'
-        required: true
-        default: ''
-      competition_id:
-        description: 'Competition id for the league (default 1)'
-        required: false
-        default: '1'
-      league_name:
-        description: 'Optional league name to resolve league id'
-        required: false
-        default: ''
 
 jobs:
-  execute-bid:
+  run-daily-predictions:
     runs-on: self-hosted
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
+      - name: Show Python version
+        run: |
+          python3 --version
+          which python3
+
+      - name: Create virtual environment
+        run: |
+          rm -rf .venv
+          python3 -m venv .venv
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
 
-      - name: Run buy-player-at-time
+      - name: Run daily_predictions.py
         env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           KICK_USER: ${{ secrets.KICK_USER }}
           KICK_PASS: ${{ secrets.KICK_PASS }}
-          LEAGUE_NAME: ${{ github.event.inputs.league_name }}
         run: |
-          python buy_player_at_time.py \
-            --player-id "${{ github.event.inputs.player_id }}" \
-            --player-label "${{ github.event.inputs.player_label }}" \
-            --bid-time "${{ github.event.inputs.bid_time }}" \
-            --bid-amount "${{ github.event.inputs.bid_amount }}" \
-            --competition-id "${{ github.event.inputs.competition_id }}" \
-            --league-name "${{ github.event.inputs.league_name }}"
+          .venv/bin/python daily_predictions.py
