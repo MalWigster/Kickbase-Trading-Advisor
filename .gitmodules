@@ -1,0 +1,3 @@
+[submodule "kickbase-trigger"]
+	path = kickbase-trigger
+	url = git@github.com:MalWigster/Kickbase-Trigger.git
