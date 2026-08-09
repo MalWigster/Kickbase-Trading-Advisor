@@ -68,9 +68,9 @@ _session.mount("https://", _adapter)
 _session.mount("http://", _adapter)
 
 
-def _send_webhook_message(webhook_url, content):
+def _send_webhook_message(webhook_url, payload):
     try:
-        response = _session.post(webhook_url, json={"content": content}, timeout=10)
+        response = _session.post(webhook_url, json=payload, timeout=10)
     except requests.RequestException as exc:
         print(f"\nFailed to send Discord notification: {exc}")
         return False
@@ -79,6 +79,21 @@ def _send_webhook_message(webhook_url, content):
         print(f"\nFailed to send Discord notification: {response.status_code} {response.text}")
         return False
     return True
+
+
+def _build_summary_embed(today, budget_df, market_df, squad_df):
+    return {
+        "title": f"Kickbase Report for {today}",
+        "description": "Daily market and squad recommendations from Kickbase.",
+        "color": 0x4A90E2,
+        "fields": [
+            {"name": "Manager Budgets", "value": f"{len(budget_df)} rows", "inline": True},
+            {"name": "Market Recommendations", "value": f"{len(market_df)} rows", "inline": True},
+            {"name": "Squad Recommendations", "value": f"{len(squad_df)} rows", "inline": True},
+        ],
+        "footer": {"text": "Kickbase Trading Advisor"},
+        "timestamp": datetime.now(ZoneInfo("Europe/Berlin")).isoformat(),
+    }
 
 
 def send_notification(budget_df, market_df, squad_df, webhook_url=None):
@@ -93,7 +108,13 @@ def send_notification(budget_df, market_df, squad_df, webhook_url=None):
     date_to_show = now + timedelta(days=1) if now.hour >= 22 else now
     today = date_to_show.strftime("%d-%m-%Y")
 
-    messages = [f"**Kickbase Report for {today}**"]
+    summary_payload = {
+        "username": "Kickbase PredictorAPP",
+        "embeds": [_build_summary_embed(today, budget_df, market_df, squad_df)],
+    }
+    if not _send_webhook_message(webhook_url, summary_payload):
+        return
+
     for title, df in (
         ("Manager Budgets", budget_df),
         ("Market Recommendations", market_df),
@@ -102,14 +123,9 @@ def send_notification(budget_df, market_df, squad_df, webhook_url=None):
         table_text = format_df_for_discord(df)
         chunks = list(split_long_text(table_text, max_length=1900 - 8))
         for index, chunk in enumerate(chunks):
-            if index == 0:
-                messages.append(f"**{title}**\n```\n{chunk}\n```")
-            else:
-                messages.append(f"```\n{chunk}\n```")
-
-    for content in messages:
-        if not _send_webhook_message(webhook_url, content):
-            return
+            content = f"**{title}**\n```\n{chunk}\n```" if index == 0 else f"```\n{chunk}\n```"
+            if not _send_webhook_message(webhook_url, {"username": "Kickbase PredictorAPP", "content": content}):
+                return
 
     print("\nDiscord notification sent successfully!")
 
