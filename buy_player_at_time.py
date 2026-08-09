@@ -3,6 +3,7 @@ import os
 import sqlite3
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from kickbase_api.bids import place_bid
@@ -30,7 +31,12 @@ def parse_args():
 def parse_utc_iso(timestamp: str) -> datetime:
     if timestamp.endswith("Z"):
         timestamp = timestamp[:-1] + "+00:00"
-    return datetime.fromisoformat(timestamp).astimezone(timezone.utc)
+        dt = datetime.fromisoformat(timestamp)
+    else:
+        # Interpret naive datetimes as Berlin time
+        dt = datetime.fromisoformat(timestamp).replace(tzinfo=ZoneInfo("Europe/Berlin"))
+
+    return dt.astimezone(timezone.utc)
 
 
 def wait_for_target_time(target_time: datetime):
