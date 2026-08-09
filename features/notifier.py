@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import os
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 def format_df_for_discord(df, max_rows=20, max_cols=8):
@@ -50,8 +52,29 @@ def split_long_text(text, max_length=1900):
         yield chunk
 
 
+_session = requests.Session()
+_retries = Retry(
+    total=5,
+    connect=5,
+    read=5,
+    status=5,
+    backoff_factor=1,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=frozenset(["HEAD", "GET", "POST", "OPTIONS"]),
+    raise_on_status=False,
+)
+_adapter = HTTPAdapter(max_retries=_retries)
+_session.mount("https://", _adapter)
+_session.mount("http://", _adapter)
+
+
 def _send_webhook_message(webhook_url, content):
-    response = requests.post(webhook_url, json={"content": content}, timeout=10)
+    try:
+        response = _session.post(webhook_url, json={"content": content}, timeout=10)
+    except requests.RequestException as exc:
+        print(f"\nFailed to send Discord notification: {exc}")
+        return False
+
     if not response.ok:
         print(f"\nFailed to send Discord notification: {response.status_code} {response.text}")
         return False
