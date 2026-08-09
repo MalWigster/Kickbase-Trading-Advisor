@@ -134,7 +134,7 @@ def main():
             print(f"- {player_id}: {first_name} {last_name} (team={team_name}, competition_id={db_competition_id})")
         return
 
-    if not args.bid_time or not args.bid_amount:
+    if not args.bid_time or not args.bid_amount:    
         raise SystemExit("--bid-time and --bid-amount are required unless --search-only is used.")
 
     target_time = parse_utc_iso(args.bid_time)

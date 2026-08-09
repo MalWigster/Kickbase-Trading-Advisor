@@ -1,90 +1,68 @@
 from datetime import datetime, timedelta
-from email.message import EmailMessage
 from zoneinfo import ZoneInfo
-import smtplib
 import os
+import requests
 
-def send_mail(budget_df, market_df, squad_df, email):
-    """Sends an email with the provided DataFrames as HTML tables."""
 
-    if not email:
-        print("\nNo email provided, skipping email sending.")
+def format_df_for_discord(df, max_rows=8, max_cols=6):
+    if df is None or df.empty:
+        return "No data available."
+
+    df = df.copy()
+    if len(df.columns) > max_cols:
+        df = df.iloc[:, :max_cols]
+
+    truncated = False
+    if len(df) > max_rows:
+        df = df.head(max_rows)
+        truncated = True
+
+    table = df.to_string(index=False, justify="left")
+    if truncated:
+        table += "\n... (truncated)"
+    return table
+
+
+def send_notification(budget_df, market_df, squad_df, webhook_url=None):
+    """Send a Kickbase report using a Discord webhook."""
+
+    webhook_url = webhook_url or os.getenv("DISCORD_WEBHOOK_URL")
+    if not webhook_url:
+        print("\nNo Discord webhook URL provided, skipping notification.")
         return
 
-    EMAIL_ADDRESS = os.getenv("EMAIL_USER")
-    EMAIL_PASSWORD = os.getenv("EMAIL_PASS")
-
-    # If it's 22:00 or later, show tomorrow's date; else today
     now = datetime.now(ZoneInfo("Europe/Berlin"))
     date_to_show = now + timedelta(days=1) if now.hour >= 22 else now
     today = date_to_show.strftime("%d-%m-%Y")
 
-    # Metadata for the email
-    msg = EmailMessage()
-    msg["Subject"] = f"Kickbase: {today}"
-    msg["From"] = EMAIL_ADDRESS
-    msg["To"] = email
+    message_parts = [f"**Kickbase Report for {today}**"]
 
-    # Styling function for DataFrames
-    def style_df(df):
-        return df.to_html(index=False, border=0, classes="dataframe", escape=False).replace(
-            "<table",
-            '<table style="width:100%;border-collapse:collapse;font-size:13px;margin:20px 0;"'
-        ).replace(
-            "<th>",
-            '<th style="background:#2c3e50;color:white;padding:8px;text-align:left;border-bottom:1px solid #ddd;">'
-        ).replace(
-            "<td>",
-            '<td style="padding:8px;border-bottom:1px solid #eee;">'
-        ).replace(
-            '<tr style="text-align: right;">',
-            '<tr style="background-color:#fefefe;">'
+    message_parts.append("**Manager Budgets**")
+    message_parts.append(f"```\n{format_df_for_discord(budget_df)}\n```")
+
+    message_parts.append("**Market Recommendations**")
+    message_parts.append(f"```\n{format_df_for_discord(market_df)}\n```")
+
+    message_parts.append("**Squad Recommendations**")
+    message_parts.append(f"```\n{format_df_for_discord(squad_df)}\n```")
+
+    content = "\n".join(message_parts)
+    if len(content) > 1900:
+        content = (
+            f"**Kickbase Report for {today}**\n"
+            f"Manager Budgets: {len(budget_df)} rows\n"
+            f"Market Recommendations: {len(market_df)} rows\n"
+            f"Squad Recommendations: {len(squad_df)} rows"
         )
 
-    # Set email content
-    msg.set_content("Sorry, results only via html visible.", subtype="plain")
-    msg.add_alternative(f"""\
-    <html>
-    <body style="font-family: Arial, sans-serif; background-color: #f9f9f9; margin: 0; padding: 20px;">
-        <div style="max-width: 1000px; margin: auto; background: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow-x: auto;">
-        
-        <h2 style="color: #2c3e50; text-align: center; margin-top: 0;">Kickbase Report for {today}</h2>
-        
-        <p style="font-size: 14px; color: #333;">Greetings!</p>
+    response = requests.post(webhook_url, json={"content": content})
+    if response.ok:
+        print("\nDiscord notification sent successfully!")
+    else:
+        print(f"\nFailed to send Discord notification: {response.status_code} {response.text}")
 
-        <h3 style="color: #2c3e50; margin-top: 30px;">Manager Budgets</h3>
-        <p style="font-size: 14px; color: #333;">Here are the current budgets of all managers in your league:</p>
-        {style_df(budget_df)}
 
-        <h3 style="color: #2c3e50; margin-top: 30px;">Current Market Predictions</h3>
-        <p style="font-size: 14px; color: #333;">The following table shows all available players with a substantial positive predicted market value for the next day:</p>
-
-        {style_df(market_df)}
-
-        <h3 style="color: #2c3e50; margin-top: 30px;">Your Squad Predictions</h3>
-        <p style="font-size: 14px; color: #333;">Here are the predicted market values for all players currently in your squad:</p>
-
-        {style_df(squad_df)}
-
-        <p style="margin-top: 20px; font-size: 14px;">Best regards, <br><b>Your KickAdvisor Bot</b></p>
-        
-        <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
-        <p style="font-size: 11px; color: gray; text-align: center;">
-            This email was generated by the 
-            <a href="https://github.com/LennardFe/Kickbase-Trading-Advisor" 
-            style="color: #888; text-decoration: none; font-weight: bold;">
-            Kickbase Trading Advisor
-            </a>
-        </p>
-        </div>
-    </body>
-    </html>
-    """, subtype="html")
-
-    # Send email via Gmail SMTP
-    with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
-        smtp.starttls()
-        smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-        smtp.send_message(msg)
-        
-    print("\nEmail sent successfully!")
+def send_mail(*args, **kwargs):
+    """Legacy compatibility wrapper for email notifier."""
+    print("\nThe email notifier is deprecated. Use DISCORD_WEBHOOK_URL for Discord notifications.")
+    return send_notification(*args, **kwargs)

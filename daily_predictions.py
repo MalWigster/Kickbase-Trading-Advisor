@@ -3,7 +3,7 @@ from features.predictions.preprocessing import preprocess_player_data, split_dat
 from features.predictions.modeling import train_model, evaluate_model
 from kickbase_api.league import get_league_id
 from kickbase_api.user import login
-from features.notifier import send_mail
+from features.notifier import send_notification
 from features.predictions.data_handler import (
     create_player_data_table,
     check_if_data_reload_needed,
@@ -58,7 +58,7 @@ competition_ids = [1]                   # 1 = Bundesliga, 2 = 2. Bundesliga, 3 =
 league_name = "mtv isenbuettel"          # Name of your league, must be exact match, can be done via env or hardcoded
 start_budget = 50_000_000               # Starting budget of your league, used to calculate current budgets of other managers
 league_start_date = "2025-08-08"        # Start date of your league, used to filter activities, format: YYYY-MM-DD
-email = os.getenv("EMAIL_USER")         # Email to send recommendations to, can be the same as EMAIL_USER or different
+# Set DISCORD_WEBHOOK_URL in your environment to receive notifications in Discord
 
 # ---------------------------------------------------
 
@@ -106,5 +106,6 @@ squad_recommendations_df = join_current_squad(token, league_id, live_predictions
 print("\n=== Squad Recommendations ===")
 display(squad_recommendations_df)
 
-# Send email with recommendations
-send_mail(manager_budgets_df, market_recommendations_df, squad_recommendations_df, email)
+# Send Discord notification with recommendations
+discord_webhook = os.getenv("DISCORD_WEBHOOK_URL")
+send_notification(manager_budgets_df, market_recommendations_df, squad_recommendations_df, discord_webhook)
